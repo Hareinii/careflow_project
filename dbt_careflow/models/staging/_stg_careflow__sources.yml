@@ -1,0 +1,26 @@
+version: 2
+
+sources:
+  - name: careflow_raw
+    description: Raw patient-flow event log stored in BigQuery and used as the source for CareFlow staging models.
+    schema: careflow_raw
+    tables:
+      - name: event_log
+        description: One row per activity or event for a patient case or journey.
+        columns:
+          - name: case_id
+            description: Unique patient or case journey identifier.
+          - name: activity_name
+            description: Process activity or event label associated with the case.
+          - name: timestamp
+            description: Event timestamp for the recorded activity.
+          - name: patient_age
+            description: Patient age recorded for the case.
+          - name: gender
+            description: Patient gender or demographic category.
+          - name: doctor_id
+            description: Assigned doctor or clinician tied to the case.
+          - name: priority
+            description: Case priority category such as urgent, routine, or similar operational labels.
+          - name: journey_type
+            description: Type of patient journey or treatment pathway.
