@@ -7,59 +7,82 @@ One row = one event or activity for one patient case.
 - Platform: BigQuery
 - Dataset: careflow_raw
 - Table: event_log
+- Records: 6,800 (after deduplication from 6,868 raw events)
+- Cases: 1,000 unique patient journeys
+- Date Range: 2022-10-31 to 2025-08-02
 
 ## Architecture
 Raw -> Staging -> Marts
 
-## Proposed production schema
-The following fields represent the expected business schema for the final patient-flow event log. These are the logical fields we want to standardize before downstream analysis.
+## Raw BigQuery Schema (careflow_raw.event_log)
 
-- case_id: STRING — Unique patient/case journey identifier.
-- activity_name: STRING — Process activity or event label.
-- timestamp: TIMESTAMP — Event timestamp in UTC or normalized local time.
-- patient_age: INT64 — Patient age.
-- gender: STRING — Patient gender or category.
-- doctor_id: STRING — Assigned doctor or clinician.
-- priority: STRING — Case priority category.
-- journey_type: STRING — Type of patient journey.
+The actual dataset contains the following fields:
 
-## Actual temporary dataset schema
-The current temporary CSV is a working/raw extraction and is not yet the final governed schema. It contains provisional fields that require business validation before being promoted into the core model.
+- event_id: STRING — Unique event identifier within a case (e.g., CF00228_E05)
+- case_id: STRING — Unique patient/case journey identifier (e.g., CF00228)
+- activity_name: STRING — Healthcare activity type (Doctor Review, Triage, Registration, Doctor Consultation, Discharge, X-Ray)
+- timestamp: TIMESTAMP — Event timestamp
+- department: STRING — Department where event occurred (currently all Emergency)
+- doctor_id: STRING — Healthcare provider identifier (DR001-DR020)
+- priority: STRING — Case priority (High, Medium, Low)
+- journey_type: STRING — Patient journey classification (Normal, Loopback, Delayed)
+- source_row: INT64 — Row number from source extraction
+- source_system: STRING — Source system identifier (WaitData.Published_F1)
 
-- event_id: STRING — Temporary source identifier.
-- case_id: STRING — Case identifier in the source extract.
-- activity_name: STRING — Event label in the source extract.
-- timestamp: TIMESTAMP — Event timestamp.
-- source_row: STRING — Source row reference from the file.
-- source_sheet: STRING — Source tab or sheet reference.
-- source_system: STRING — System of origin for the row.
-- wait: FLOAT64 — Waiting metric; may be negative and requires business interpretation.
-- sum_waits: FLOAT64 — Aggregated waiting values from the source extract.
-- avg_how_early_waiting: FLOAT64 — Early waiting metric from the source extract.
-- flow_count_2: INT64 — Temporary flow metric.
-- flow_count_4: INT64 — Temporary flow metric.
-- delay_count: INT64 — Temporary delay metric.
+## Staging Layer (stg_careflow__events)
 
-Important:
-- These temporary columns must not be silently renamed or treated as the final business schema.
-- Negative waiting values should not be removed automatically without confirming whether they represent early arrival, early processing, schedule variance, or a real data-quality issue.
-- The final model should only promote validated fields into the production event-log schema.
+The staging model applies the following transformations:
+
+- Deduplicate: Remove 68 full-row duplicates (keep first by source_row)
+- Cast: Explicitly cast all columns to intended data types
+- Trim: Remove leading/trailing whitespace from string fields
+- Rename: timestamp → event_timestamp (for clarity)
+
+Output row count: 6,800 events (unique by event_id)
 
 ## Planned data-quality checks
-The following checks are planned for the staging and validation layer once the final business schema is confirmed:
 
-- Case_ID cannot be NULL
-- Activity_Name cannot be NULL
-- Timestamp cannot be NULL
-- Patient_Age should have a valid range
-- Priority should contain accepted categories
-- Journey_Type should contain accepted categories
-- Duplicate event records should be investigated
-- Event chronology within each case should be validated
+The following tests are implemented in the staging layer:
 
-## Data-flow intent
-The model architecture is intentionally simple for Day 1:
+### Critical field validation
+- event_id: NOT NULL, UNIQUE
+- case_id: NOT NULL
+- activity_name: NOT NULL, IN (valid activity types)
+- event_timestamp: NOT NULL
+- department: NOT NULL
+- doctor_id: NOT NULL
+- priority: NOT NULL, IN (High, Medium, Low)
+- journey_type: NOT NULL, IN (Normal, Loopback, Delayed)
+- source_row: NOT NULL
+- source_system: NOT NULL, IN (WaitData.Published_F1)
 
-Raw event log -> BigQuery -> dbt staging -> dbt marts
+## Data Quality Summary
 
-This keeps the project clean while ensuring the team can add standardization, validation, and downstream metrics in later phases.
+| Issue | Status | Action |
+|-------|--------|--------|
+| Null values | ✅ None | No treatment needed |
+| Duplicates | ⚠️ 68 found | Deduplicated in staging |
+| Invalid timestamps | ✅ None | None found |
+| Future timestamps | ✅ None | None found |
+| Category inconsistencies | ✅ None | No variations detected |
+
+## Known Data Characteristics
+
+- **Single department**: All records from Emergency department
+- **Loopback cases**: Average 8.07 events per case (vs 6.07 for Normal)
+- **Journey types**: Normal (52.3%), Loopback (40%), Delayed (7.7%)
+- **Event distribution**: 6-10 events per case, mean 6.87
+- **Priorities**: Balanced distribution (High 32.2%, Medium 33.9%, Low 33.8%)
+- **Doctors**: 20 clinicians with relatively even workload distribution
+
+## Future Analytics
+
+Day 3+ will add:
+
+- Case-level metrics (start time, end time, duration)
+- Activity timing metrics (duration between activities)
+- Process path analysis (sequence of activities per case)
+- Waiting time metrics (derived from timestamps)
+- Department and doctor performance metrics
+- Journey type analysis (Normal vs Loopback vs Delayed)
+

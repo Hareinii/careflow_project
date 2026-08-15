@@ -2,25 +2,32 @@ version: 2
 
 sources:
   - name: careflow_raw
-    description: Raw patient-flow event log stored in BigQuery and used as the source for CareFlow staging models.
+    description: |
+      Raw healthcare event log containing patient case events and activities.
+      Source contains 6,868 events across 1,000 unique cases.
+      Note: Contains 68 duplicate event_id records that require deduplication.
     schema: careflow_raw
     tables:
       - name: event_log
-        description: One row per activity or event for a patient case or journey.
+        description: One row per activity or event for a patient case journey.
         columns:
+          - name: event_id
+            description: "Unique event identifier within a case. Example: CF00228_E05. Note: 68 duplicate event_ids exist in the source data."
           - name: case_id
-            description: Unique patient or case journey identifier.
+            description: "Unique patient or case journey identifier. Example: CF00228."
           - name: activity_name
-            description: Process activity or event label associated with the case.
+            description: "Type of healthcare activity or event such as Doctor Review, Triage, Registration, Doctor Consultation, Discharge, or X-Ray."
           - name: timestamp
-            description: Event timestamp for the recorded activity.
-          - name: patient_age
-            description: Patient age recorded for the case.
-          - name: gender
-            description: Patient gender or demographic category.
+            description: Timestamp when the event occurred.
+          - name: department
+            description: Department where the event occurred. Currently all records labeled Emergency.
           - name: doctor_id
-            description: Assigned doctor or clinician tied to the case.
+            description: "Identifier of the clinician associated with the event. Example: DR001 through DR020."
           - name: priority
-            description: Case priority category such as urgent, routine, or similar operational labels.
+            description: "Priority level of the case. Values: High, Medium, Low."
           - name: journey_type
-            description: Type of patient journey or treatment pathway.
+            description: "Classification of the patient journey. Values: Normal, Loopback, Delayed."
+          - name: source_row
+            description: Row number from the source extraction.
+          - name: source_system
+            description: System identifier for the data source. All records from WaitData.Published_F1.

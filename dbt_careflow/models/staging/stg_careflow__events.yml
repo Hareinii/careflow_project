@@ -1,0 +1,57 @@
+version: 2
+
+models:
+  - name: stg_careflow__events
+    description: Cleaned and deduplicated event log staging model.
+    columns:
+      - name: event_id
+        description: Unique event identifier.
+        tests:
+          - unique
+          - not_null
+      - name: case_id
+        description: Unique case/patient journey identifier.
+        tests:
+          - not_null
+      - name: activity_name
+        description: Type of healthcare activity.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Doctor Review', 'Triage', 'Registration', 'Doctor Consultation', 'Discharge', 'X-Ray']
+      - name: event_timestamp
+        description: Timestamp of the event.
+        tests:
+          - not_null
+      - name: department
+        description: Department where event occurred.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Emergency']
+      - name: doctor_id
+        description: Healthcare provider identifier.
+        tests:
+          - not_null
+      - name: priority
+        description: Priority level of the case.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['High', 'Low', 'Medium']
+      - name: journey_type
+        description: Classification of patient journey.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Normal', 'Loopback', 'Delayed']
+      - name: source_row
+        description: Row number from source extract.
+        tests:
+          - not_null
+      - name: source_system
+        description: Identifier of source system.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['WaitData.Published_F1']
