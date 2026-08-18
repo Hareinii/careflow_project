@@ -1,0 +1,39 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: ehr_events
+
+models:
+  - name: stg_ehr_event_log
+    description: Cleaned, deduplicated, sequenced EHR event log
+    columns:
+      - name: case_id
+        tests:
+          - not_null
+      - name: activity_name
+        tests:
+          - not_null
+      - name: event_timestamp
+        tests:
+          - not_null
+
+  - name: activity_transitions
+    description: Average transition time between every pair of consecutive activities
+    columns:
+      - name: from_activity
+        tests:
+          - not_null
+      - name: to_activity
+        tests:
+          - not_null
+
+  - name: conformance_check
+    description: Per-case flag for whether the patient journey matched the ideal path
+    columns:
+      - name: case_id
+        tests:
+          - not_null
+          - unique
