@@ -1,0 +1,73 @@
+version: 2
+
+models:
+  - name: int_careflow__ordered_events
+    description: Intermediate table with event sequencing and transition information. Every event is ordered within each case with LAG/LEAD for previous and next activities, plus transition durations.
+    columns:
+      - name: event_id
+        description: Unique event identifier
+        tests:
+          - unique
+          - not_null
+      - name: case_id
+        description: Unique case identifier
+        tests:
+          - not_null
+      - name: activity_name
+        description: Type of healthcare activity
+        tests:
+          - not_null
+      - name: event_timestamp
+        description: Timestamp when event occurred
+        tests:
+          - not_null
+      - name: event_sequence
+        description: Sequential order of event within case (1, 2, 3, etc.)
+        tests:
+          - not_null
+      - name: previous_activity
+        description: Activity that occurred immediately before this event (NULL if first event)
+      - name: next_activity
+        description: Activity that occurs immediately after this event (NULL if last event)
+      - name: previous_event_timestamp
+        description: Timestamp of previous event (NULL if first event)
+      - name: next_event_timestamp
+        description: Timestamp of next event (NULL if last event)
+      - name: is_first_event
+        description: Flag indicating if this is the first event in the case
+        tests:
+          - not_null
+      - name: is_last_event
+        description: Flag indicating if this is the last event in the case
+        tests:
+          - not_null
+      - name: transition_duration_minutes
+        description: Minutes elapsed between previous event and this event (NULL if first event)
+      - name: first_event_timestamp
+        description: Timestamp of the first event in the case
+        tests:
+          - not_null
+      - name: last_event_timestamp
+        description: Timestamp of the last event in the case
+        tests:
+          - not_null
+      - name: department
+        description: Department where event occurred
+        tests:
+          - not_null
+      - name: doctor_id
+        description: Healthcare provider identifier
+        tests:
+          - not_null
+      - name: priority
+        description: Priority level of the case
+        tests:
+          - not_null
+      - name: journey_type
+        description: Classification of patient journey
+        tests:
+          - not_null
+      - name: source_row
+        description: Row number from source extract
+      - name: source_system
+        description: Source system identifier

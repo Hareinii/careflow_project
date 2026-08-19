@@ -1,0 +1,338 @@
+version: 2
+
+models:
+  - name: mart_careflow__transitions
+    description: >
+      Transition-level summary mart. One row per unique transition type observed in the dataset.
+      Aggregates duration statistics across all occurrences of each from_activity → to_activity pair.
+
+      GRAIN: One row = one unique transition type (e.g. "Registration → Triage").
+
+      KEY DISTINCTION — transition_count vs case_count:
+        transition_count = COUNT(*): total occurrences of this transition across all cases.
+        case_count = COUNT(DISTINCT case_id): number of distinct cases containing this transition.
+        A case with a repeated activity may contribute more than one occurrence of a transition,
+        so transition_count >= case_count always.
+
+      PERCENTILE METHOD:
+        All percentiles use DuckDB PERCENTILE_CONT which computes EXACT percentiles
+        (not approximate). Aggregates exclude NULL durations per SQL standard behavior.
+        Negative durations are INCLUDED in statistics as data-quality signals.
+
+      SHARE OF TOTAL TRANSITION TIME:
+        Calculated as (sum of all transition durations for this transition type)
+        / (sum of all transition durations across all types) * 100.
+        Based on transition OCCURRENCES (all rows), not distinct cases.
+        This gives the operational view: where is total process time consumed?
+
+    columns:
+      - name: transition_name
+        description: >
+          Dynamically generated label. Format: "from_activity → to_activity".
+          Examples: "Registration → Triage", "Doctor Assessment → X-Ray".
+          No activity names are hard-coded in the model.
+        tests:
+          - not_null
+          - unique
+
+      - name: transition_count
+        description: >
+          Total number of occurrences of this transition across all cases.
+          Uses COUNT(*). May be greater than case_count if a case loops back
+          through the same activity pair multiple times.
+        tests:
+          - not_null
+
+      - name: case_count
+        description: >
+          Number of distinct cases (case_id) that contain this transition at least once.
+          Uses COUNT(DISTINCT case_id). Always <= transition_count.
+        tests:
+          - not_null
+
+      - name: null_duration_count
+        description: >
+          Number of transition records where transition_duration_minutes is NULL.
+          Should be 0 for a healthy dataset after excluding final events.
+          Non-zero values require data quality investigation.
+
+      - name: negative_duration_count
+        description: >
+          Number of transition records where transition_duration_minutes < 0.
+          Negative durations are NOT removed — they are visible for investigation.
+          Possible causes: timestamp errors, concurrent events, clock drift.
+
+      - name: avg_duration_minutes
+        description: >
+          Average transition duration in minutes. Excludes NULL values.
+          May be influenced by outliers — interpret alongside median and P95.
+
+      - name: median_duration_minutes
+        description: >
+          Exact 50th percentile of transition duration. Computed via
+          PERCENTILE_CONT(0.50). Less sensitive to outliers than average.
+          Provides the "typical" case experience for this transition.
+
+      - name: p75_duration_minutes
+        description: >
+          Exact 75th percentile of transition duration.
+          75% of transitions complete within this duration.
+
+      - name: p90_duration_minutes
+        description: >
+          Exact 90th percentile of transition duration.
+          90% of transitions complete within this duration.
+          Useful for understanding near-worst-case performance.
+
+      - name: p95_duration_minutes
+        description: >
+          Exact 95th percentile of transition duration.
+          95% of transitions complete within this duration.
+          Key tail-risk metric — captures the long-delay experience.
+
+      - name: min_duration_minutes
+        description: >
+          Minimum observed transition duration in minutes.
+          Negative values indicate data quality issues or concurrent event timestamps.
+
+      - name: max_duration_minutes
+        description: >
+          Maximum observed transition duration in minutes.
+          Largest observed duration — may represent operational outliers.
+
+      - name: stddev_duration_minutes
+        description: >
+          Standard deviation of transition duration in minutes.
+          High standard deviation indicates high performance variability —
+          some cases complete quickly while others are significantly delayed.
+
+      - name: total_duration_sum
+        description: >
+          Sum of all transition_duration_minutes for this transition type.
+          Used in share_of_total_transition_time_pct calculation.
+
+      - name: grand_total_duration
+        description: >
+          Sum of all transition_duration_minutes across all transition types.
+          Denominator for share_of_total_transition_time_pct.
+
+      - name: share_of_total_transition_time_pct
+        description: >
+          Percentage of total measured transition time attributable to this
+          transition type. Calculated as (total_duration_sum / grand_total_duration * 100).
+          Based on all transition occurrences, not distinct cases.
+          High share indicates this transition consumes significant process time.
+
+  - name: mart_careflow__bottlenecks
+    description: >
+      Bottleneck candidate analysis. One row per unique transition type.
+      Applies multi-signal scoring to identify transitions warranting business investigation.
+      Does NOT declare confirmed operational bottlenecks — business context required.
+
+      METHODOLOGY:
+        Five signals are evaluated using data-driven thresholds (median of each metric
+        across all transitions). No arbitrary fixed thresholds are used.
+        Signal 1: High Median Duration — typical case takes long
+        Signal 2: High P95 Duration — long-tail risk
+        Signal 3: High Transition Volume — systemic frequency risk
+        Signal 4: High Share of Total Time — large process time consumer
+        Signal 5: High Duration Variability — inconsistent performance
+
+      CATEGORIES:
+        Strong Candidate: 3+ signals triggered
+        Moderate Candidate: 2 signals triggered
+        Weak Candidate: 1 signal triggered
+        No Signal: 0 signals triggered
+
+    columns:
+      - name: transition_name
+        description: Unique transition pair label (from_activity → to_activity).
+        tests:
+          - not_null
+          - unique
+
+      - name: bottleneck_category
+        description: >
+          Overall bottleneck candidate classification.
+          Values: Strong Candidate, Moderate Candidate, Weak Candidate, No Signal.
+          Based on count of signals triggered. Not a confirmed business bottleneck.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Strong Candidate', 'Moderate Candidate', 'Weak Candidate', 'No Signal']
+
+      - name: bottleneck_signals_count
+        description: Number of bottleneck signals triggered (0–5).
+        tests:
+          - not_null
+
+      - name: bottleneck_flags
+        description: >
+          Pipe-delimited list of triggered signal labels.
+          Examples: "High Duration | High Time Share"
+          Empty string if no signals triggered.
+
+      - name: transition_count
+        description: Total occurrences of this transition. From mart_careflow__transitions.
+        tests:
+          - not_null
+
+      - name: case_count
+        description: Distinct cases containing this transition. From mart_careflow__transitions.
+        tests:
+          - not_null
+
+      - name: avg_duration_minutes
+        description: Average transition duration. From mart_careflow__transitions.
+      - name: median_duration_minutes
+        description: Median transition duration. From mart_careflow__transitions.
+      - name: p90_duration_minutes
+        description: P90 transition duration. From mart_careflow__transitions.
+      - name: p95_duration_minutes
+        description: P95 transition duration. From mart_careflow__transitions.
+      - name: min_duration_minutes
+        description: Minimum transition duration. From mart_careflow__transitions.
+      - name: max_duration_minutes
+        description: Maximum transition duration. From mart_careflow__transitions.
+      - name: stddev_duration_minutes
+        description: Standard deviation of transition duration. From mart_careflow__transitions.
+      - name: share_of_total_transition_time_pct
+        description: Percentage of total process time for this transition. From mart_careflow__transitions.
+      - name: null_duration_count
+        description: Count of null durations for this transition.
+      - name: negative_duration_count
+        description: Count of negative durations for this transition.
+
+      - name: signal_high_duration
+        description: >
+          TRUE if median_duration_minutes > median of all medians across transitions.
+          Threshold is data-driven (median of the median distribution).
+      - name: signal_high_tail_risk
+        description: TRUE if p95_duration_minutes > median of all P95 values.
+      - name: signal_high_volume
+        description: TRUE if transition_count > median of all transition counts.
+      - name: signal_high_time_share
+        description: TRUE if share_of_total_transition_time_pct > median of all shares.
+      - name: signal_high_variability
+        description: TRUE if stddev_duration_minutes > median of all stddev values.
+
+      - name: threshold_median_duration
+        description: >
+          Data-driven threshold used for signal_high_duration.
+          Computed as PERCENTILE_CONT(0.50) of all median_duration_minutes values.
+      - name: threshold_p95_duration
+        description: Data-driven threshold for signal_high_tail_risk.
+      - name: threshold_volume
+        description: Data-driven threshold for signal_high_volume.
+      - name: threshold_time_share
+        description: Data-driven threshold for signal_high_time_share.
+      - name: threshold_variability
+        description: Data-driven threshold for signal_high_variability.
+
+  - name: mart_careflow__kpis
+    description: >
+      Overall CareFlow KPI foundation. Single-row reporting snapshot.
+      Aggregates core process metrics from Day 3 case and event models plus
+      Day 4 transition metrics. Includes candidate transition KPIs and
+      mandatory reconciliation checks.
+
+      GRAIN: One row = one overall reporting snapshot.
+
+      CANDIDATE KPI NOTE:
+        Transition-level KPIs are labelled "candidate" because their business
+        definitions have not been confirmed by domain stakeholders.
+        "Arrival → Exam Started" does not exist in the current dataset;
+        its columns return NULL for forward compatibility.
+        No transition is labelled "waiting time" without business confirmation.
+
+      RECONCILIATION:
+        Case count reconciliation: fct_careflow__cases vs int_careflow__ordered_events.
+        Transition count reconciliation: int_careflow__transition_metrics vs
+        non-final events in int_careflow__ordered_events.
+
+    columns:
+      - name: total_events
+        description: Total number of event records in int_careflow__ordered_events.
+      - name: total_cases
+        description: Number of distinct case_id values in fct_careflow__cases.
+      - name: average_events_per_case
+        description: total_events / total_cases. Proxy for process complexity per case.
+      - name: average_cycle_time_minutes
+        description: Average case cycle time (last event - first event) in minutes.
+      - name: median_cycle_time_minutes
+        description: Exact 50th percentile of case cycle time via PERCENTILE_CONT.
+      - name: p90_cycle_time_minutes
+        description: Exact 90th percentile of case cycle time.
+      - name: p95_cycle_time_minutes
+        description: Exact 95th percentile of case cycle time.
+      - name: minimum_cycle_time_minutes
+        description: Minimum observed case cycle time.
+      - name: maximum_cycle_time_minutes
+        description: Maximum observed case cycle time.
+      - name: repeat_activity_case_count
+        description: Cases where has_repeated_activity = true (loopbacks detected).
+      - name: repeat_activity_case_percentage
+        description: repeat_activity_case_count / total_cases * 100.
+      - name: unique_process_path_count
+        description: Count of distinct process_path values. Higher = more journey variability.
+      - name: candidate_reg_to_triage_count
+        description: >
+          CANDIDATE METRIC. Count of Registration → Triage transitions.
+          Not confirmed as an operational KPI. Labelled "Registration-to-Triage
+          Transition Duration". See Day 4 report for business interpretation guidance.
+      - name: candidate_reg_to_triage_avg_minutes
+        description: Average duration of Registration → Triage transition in minutes.
+      - name: candidate_reg_to_triage_median_minutes
+        description: Median duration of Registration → Triage transition in minutes.
+      - name: candidate_reg_to_triage_p90_minutes
+        description: P90 duration of Registration → Triage transition in minutes.
+      - name: candidate_reg_to_triage_p95_minutes
+        description: P95 duration of Registration → Triage transition in minutes.
+      - name: candidate_assessment_to_xray_count
+        description: >
+          CANDIDATE METRIC. Count of Doctor Assessment → X-Ray transitions.
+          Represents diagnostic initiation transition duration.
+      - name: candidate_assessment_to_xray_avg_minutes
+        description: Average duration of Doctor Assessment → X-Ray transition in minutes.
+      - name: candidate_assessment_to_xray_median_minutes
+        description: Median duration of Doctor Assessment → X-Ray transition in minutes.
+      - name: candidate_assessment_to_xray_p90_minutes
+        description: P90 duration of Doctor Assessment → X-Ray transition in minutes.
+      - name: candidate_assessment_to_xray_p95_minutes
+        description: P95 duration of Doctor Assessment → X-Ray transition in minutes.
+      - name: candidate_arrival_to_exam_count
+        description: >
+          CANDIDATE METRIC. Count of Arrival → Exam Started transitions.
+          Returns NULL — this transition does not exist in the current dataset.
+          Preserved for forward compatibility when richer data is available.
+      - name: candidate_arrival_to_exam_avg_minutes
+        description: Avg Arrival → Exam Started duration. NULL in current dataset.
+      - name: candidate_arrival_to_exam_median_minutes
+        description: Median Arrival → Exam Started duration. NULL in current dataset.
+      - name: candidate_arrival_to_exam_p90_minutes
+        description: P90 Arrival → Exam Started duration. NULL in current dataset.
+      - name: candidate_arrival_to_exam_p95_minutes
+        description: P95 Arrival → Exam Started duration. NULL in current dataset.
+      - name: arrival_to_exam_data_note
+        description: Explanatory note about the absent Arrival → Exam Started transition.
+      - name: ordered_event_count
+        description: Total events in int_careflow__ordered_events. Used for reconciliation.
+      - name: fact_case_count
+        description: Distinct cases in fct_careflow__cases. Used for reconciliation.
+      - name: ordered_event_case_count
+        description: Distinct cases in int_careflow__ordered_events. Used for reconciliation.
+      - name: transition_record_count
+        description: Total rows in int_careflow__transition_metrics.
+      - name: non_final_event_count
+        description: Rows in int_careflow__ordered_events where is_last_event = false.
+      - name: reconciliation_case_counts
+        description: >
+          PASS/FAIL status comparing fact_case_count vs ordered_event_case_count.
+          PASS if equal. FAIL with details if mismatch detected.
+      - name: reconciliation_transitions
+        description: >
+          PASS/FAIL status comparing transition_record_count vs non_final_event_count.
+          PASS if equal. FAIL with details if mismatch detected.
+      - name: snapshot_generated_at
+        description: Timestamp when this KPI snapshot was generated.

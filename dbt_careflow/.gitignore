@@ -3,3 +3,9 @@ target/
 dbt_packages/
 logs/
 .env
+
+# DuckDB binary — not committed; regenerated via dbt build
+*.duckdb
+
+# Duplicate .txt files (content captured in .md equivalents)
+*.txt

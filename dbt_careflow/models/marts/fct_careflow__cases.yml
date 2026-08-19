@@ -1,0 +1,71 @@
+version: 2
+
+models:
+  - name: fct_careflow__cases
+    description: Case-level analytical fact table. One row per case with aggregated journey metrics including cycle time, event counts, process path, and repeat activity detection.
+    columns:
+      - name: case_id
+        description: Unique case identifier
+        tests:
+          - unique
+          - not_null
+      - name: department
+        description: Department associated with the case
+        tests:
+          - not_null
+      - name: doctor_id
+        description: Healthcare provider identifier
+        tests:
+          - not_null
+      - name: priority
+        description: Priority level of the case (High, Medium, Low)
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['High', 'Medium', 'Low']
+      - name: journey_type
+        description: Classification of patient journey type
+        tests:
+          - not_null
+      - name: first_event_timestamp
+        description: Timestamp of the first event in the case
+        tests:
+          - not_null
+      - name: last_event_timestamp
+        description: Timestamp of the last event in the case
+        tests:
+          - not_null
+      - name: first_activity
+        description: Name of the first activity in the case
+        tests:
+          - not_null
+      - name: last_activity
+        description: Name of the last activity in the case
+        tests:
+          - not_null
+      - name: event_count
+        description: Total number of events in the case
+        tests:
+          - not_null
+          - positive_value
+      - name: unique_activity_count
+        description: Number of unique activities in the case
+        tests:
+          - not_null
+          - positive_value
+      - name: cycle_time_minutes
+        description: Total duration of case from first to last event in minutes
+        tests:
+          - not_null
+      - name: process_path
+        description: Sequence of activities as a readable path (e.g., Scheduled → Arrival → Exam Started)
+        tests:
+          - not_null
+      - name: has_repeated_activity
+        description: Flag indicating if any activity was performed more than once in the case
+        tests:
+          - not_null
+      - name: loaded_at
+        description: Timestamp when record was loaded
+        tests:
+          - not_null

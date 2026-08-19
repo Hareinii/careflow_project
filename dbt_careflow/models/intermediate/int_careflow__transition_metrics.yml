@@ -1,0 +1,141 @@
+version: 2
+
+models:
+  - name: int_careflow__transition_metrics
+    description: >
+      Intermediate model producing one row per event-to-next-event transition per case.
+      The final event of each case is excluded (it has no next event).
+      This model is the foundation for transition-level analysis, bottleneck
+      identification, and KPI calculation in Day 4.
+
+      GRAIN: One row = one forward-facing transition (from_activity → to_activity) for one case.
+
+      METRIC SEMANTICS: transition_duration_minutes represents elapsed time between two
+      recorded events. It does NOT automatically imply waiting time or idle time.
+      The business meaning of each transition must be established through domain review.
+
+      DATA QUALITY: Negative and null durations are flagged but NOT removed.
+      They require investigation to determine whether they indicate data problems
+      or legitimate operational patterns (e.g. concurrent activities).
+
+    columns:
+      - name: event_id
+        description: >
+          Unique identifier of the from_activity event (the starting event of this transition).
+          Corresponds to the event_id in int_careflow__ordered_events.
+        tests:
+          - not_null
+
+      - name: case_id
+        description: >
+          Unique case identifier. A case may contribute multiple rows to this model
+          if it contains multiple transitions.
+        tests:
+          - not_null
+
+      - name: event_sequence
+        description: >
+          Sequence position of the from_activity event within the case.
+          The to_activity event is at event_sequence + 1.
+        tests:
+          - not_null
+
+      - name: transition_name
+        description: >
+          Dynamically generated label identifying the transition pair.
+          Format: "from_activity → to_activity"
+          Example: "Registration → Triage"
+          Generated without hard-coding activity names.
+        tests:
+          - not_null
+
+      - name: from_activity
+        description: >
+          The activity at the start of this transition.
+          Sourced from activity_name in int_careflow__ordered_events.
+        tests:
+          - not_null
+
+      - name: to_activity
+        description: >
+          The activity at the end of this transition.
+          Sourced from next_activity in int_careflow__ordered_events.
+        tests:
+          - not_null
+
+      - name: from_timestamp
+        description: >
+          Timestamp of the from_activity event.
+          Sourced from event_timestamp in int_careflow__ordered_events.
+        tests:
+          - not_null
+
+      - name: to_timestamp
+        description: >
+          Timestamp of the to_activity event.
+          Sourced from next_event_timestamp in int_careflow__ordered_events.
+        tests:
+          - not_null
+
+      - name: transition_duration_minutes
+        description: >
+          Elapsed time in minutes between from_timestamp and to_timestamp.
+          This is a FORWARD-FACING duration (to_timestamp minus from_timestamp),
+          distinct from the backward-facing transition_duration_minutes in
+          int_careflow__ordered_events (which measures from previous event).
+
+          Computed as: (epoch(next_event_timestamp) - epoch(event_timestamp)) / 60
+
+          IMPORTANT: This metric does not automatically imply waiting time.
+          Business interpretation depends on the transition pair:
+            - "Registration → Triage" may reflect early processing speed
+            - "Doctor Assessment → X-Ray" may include request + travel time
+          Null if to_timestamp is null (should not occur after filtering).
+          Negative values are flagged in is_negative_duration for investigation.
+
+      - name: is_null_duration
+        description: >
+          Boolean flag. TRUE if transition_duration_minutes is NULL.
+          Should be FALSE for all rows in a healthy dataset after excluding
+          final events, but is included for data quality monitoring.
+        tests:
+          - not_null
+
+      - name: is_negative_duration
+        description: >
+          Boolean flag. TRUE if transition_duration_minutes < 0.
+          Negative durations are retained and flagged rather than deleted.
+          Possible causes: timestamp data entry errors, duplicated events,
+          source-system clock anomalies, or event ordering issues.
+          Must be investigated before drawing operational conclusions.
+        tests:
+          - not_null
+
+      - name: department
+        description: >
+          Department associated with the from_activity event.
+          Carried through from int_careflow__ordered_events for segmentation.
+        tests:
+          - not_null
+
+      - name: doctor_id
+        description: >
+          Healthcare provider identifier for the from_activity event.
+          Carried through for segmentation. Doctor-level analysis is deferred
+          to a later project day due to confounding factors (workload, case mix).
+        tests:
+          - not_null
+
+      - name: priority
+        description: >
+          Priority level of the case (e.g. High, Medium, Low).
+          All cases in this dataset carry 'High' (source-data limitation noted in Day 2).
+        tests:
+          - not_null
+
+      - name: journey_type
+        description: >
+          Classification of the patient journey type (e.g. Normal, Complex).
+          All cases in this dataset carry 'Normal' (source-data limitation noted in Day 2).
+        tests:
+          - not_null

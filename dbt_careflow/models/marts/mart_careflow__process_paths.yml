@@ -1,0 +1,52 @@
+version: 2
+
+models:
+  - name: mart_careflow__process_paths
+    description: Process path analysis table. One row per unique journey path showing frequency, performance metrics, and characteristics of cases following that path.
+    columns:
+      - name: process_path
+        description: Unique sequence of activities as a readable path
+        tests:
+          - unique
+          - not_null
+      - name: case_count
+        description: Number of cases following this process path
+        tests:
+          - not_null
+          - positive_value
+      - name: percentage_of_cases
+        description: Percentage of all cases following this process path (0-100)
+        tests:
+          - not_null
+      - name: avg_cycle_time_minutes
+        description: Average cycle time in minutes for cases following this path
+        tests:
+          - not_null
+      - name: min_cycle_time_minutes
+        description: Minimum cycle time in minutes for cases following this path
+        tests:
+          - not_null
+      - name: max_cycle_time_minutes
+        description: Maximum cycle time in minutes for cases following this path
+        tests:
+          - not_null
+      - name: cases_with_repeated_activity
+        description: Number of cases in this path that had repeated activities
+        tests:
+          - not_null
+      - name: departments_in_path
+        description: Number of unique departments involved in cases following this path
+        tests:
+          - not_null
+      - name: providers_in_path
+        description: Number of unique healthcare providers involved in cases following this path
+        tests:
+          - not_null
+      - name: priority_levels_in_path
+        description: Number of unique priority levels in cases following this path
+        tests:
+          - not_null
+      - name: loaded_at
+        description: Timestamp when record was loaded
+        tests:
+          - not_null
