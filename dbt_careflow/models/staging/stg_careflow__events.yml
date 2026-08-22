@@ -2,13 +2,33 @@ version: 2
 
 models:
   - name: stg_careflow__events
-    description: Cleaned and deduplicated event log staging model.
+    description: >
+      Cleaned and deduplicated EHR event log staging model.
+
+      DEDUPLICATION (Day 5):
+        Two-stage deduplication is applied.
+        Stage 1: deduplicates on event_id (handles ETL re-load duplicates).
+        Stage 2: deduplicates on business key (case_id, activity_name, event_timestamp),
+        retaining the record with the lowest event_id.
+        EVT019_DUP is excluded as a confirmed exact technical duplicate of EVT019.
+        Raw source data is never modified.
+
+      PRIORITY / JOURNEY TYPE PROVENANCE (Day 5):
+        Both fields are NOT present in the source CSV.
+        They are staging fabrications assigned as placeholder defaults ('High', 'Normal').
+        They must NOT be treated as confirmed operational dimensions until real values
+        are sourced from the EHR system. Treat as exploratory only.
+
     columns:
       - name: event_id
-        description: Unique event identifier.
+        description: >
+          Unique event identifier after two-stage deduplication.
+          EVT019_DUP has been excluded as an exact technical duplicate of EVT019.
+          Uniqueness is enforced at the business-key level (case_id + activity_name + event_timestamp).
         tests:
           - unique
           - not_null
+
       - name: case_id
         description: Unique case/patient journey identifier.
         tests:
@@ -18,7 +38,7 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['Doctor Review', 'Triage', 'Registration', 'Doctor Consultation', 'Discharge', 'X-Ray']
+              values: ['Doctor Review', 'Triage', 'Registration', 'Doctor Consultation', 'Discharge', 'X-Ray', 'Doctor Assessment']
       - name: event_timestamp
         description: Timestamp of the event.
         tests:
@@ -28,7 +48,7 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['Emergency']
+              values: ['Emergency', 'Radiology']
       - name: doctor_id
         description: Healthcare provider identifier.
         tests:
@@ -54,4 +74,4 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['WaitData.Published_F1']
+              values: ['WaitData.Published_F1', 'EHR']

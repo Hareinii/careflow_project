@@ -1,0 +1,102 @@
+version: 2
+
+models:
+  - name: mart_careflow__departments
+    description: >
+      Department-level KPI mart. One row per department.
+      Created in Day 5 to support operational segmentation analysis.
+
+      GRAIN: One row = one department.
+
+      CYCLE TIME CAVEAT:
+        avg_cycle_time_minutes, median_cycle_time_minutes, p90, p95 represent
+        the full case cycle time (first to last event across ALL departments)
+        for cases that have at least one event in this department.
+        They do NOT measure the time a case spends within this department alone.
+        This distinction is critical for correct interpretation.
+
+      TRANSITION GRAIN:
+        Transition metrics are attributed to the department of the FROM event.
+        Example: X-Ray → Doctor Review is attributed to Radiology (X-Ray origin).
+
+      REPEAT ACTIVITY:
+        A case is counted as repeat-activity if has_repeated_activity = true
+        and the case has at least one event in this department.
+        The repeated activity may not have occurred in this department specifically.
+
+      DEPARTMENT COMPARISON CAUTION:
+        Do not rank departments as "better" or "worse" without controlling for
+        case complexity, case mix, and process design differences.
+
+    columns:
+      - name: department
+        description: Department name from the source event log.
+        tests:
+          - not_null
+          - unique
+
+      - name: case_count
+        description: >
+          Number of distinct cases with at least one event in this department.
+          A case may appear in multiple departments.
+        tests:
+          - not_null
+
+      - name: event_count
+        description: Total number of events in this department.
+        tests:
+          - not_null
+
+      - name: avg_events_per_case
+        description: event_count / case_count. Average events per case within this department.
+
+      - name: unique_doctors
+        description: Count of distinct doctor_id values in this department.
+        tests:
+          - not_null
+
+      - name: avg_cycle_time_minutes
+        description: >
+          Average full case cycle time (min) for cases touching this department.
+          NOT time spent within the department. See model description for caveat.
+
+      - name: median_cycle_time_minutes
+        description: >
+          Median full case cycle time (exact via PERCENTILE_CONT) for cases
+          touching this department.
+
+      - name: p90_cycle_time_minutes
+        description: P90 full case cycle time for cases touching this department.
+
+      - name: p95_cycle_time_minutes
+        description: P95 full case cycle time for cases touching this department.
+
+      - name: repeat_activity_case_count
+        description: >
+          Number of cases in this department where has_repeated_activity = true.
+          The repeated activity may have occurred in any department.
+
+      - name: repeat_activity_case_percentage
+        description: repeat_activity_case_count / case_count * 100.
+
+      - name: unique_process_paths
+        description: >
+          Count of distinct process paths for cases touching this department.
+          Higher values indicate more journey variability.
+
+      - name: transition_count
+        description: >
+          Total transition records where the from_activity belongs to this department.
+          0 if no transitions originate from this department.
+        tests:
+          - not_null
+
+      - name: avg_transition_duration_minutes
+        description: >
+          Average transition duration (min) for transitions originating in this department.
+
+      - name: median_transition_duration_minutes
+        description: Median transition duration for transitions from this department.
+
+      - name: p90_transition_duration_minutes
+        description: P90 transition duration for transitions from this department.
