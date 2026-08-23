@@ -1,0 +1,33 @@
+version: 2
+
+models:
+  - name: mart_careflow__case_segments
+    description: >
+      Dashboard-ready case segmentation mart. 
+      Extends the base case fact table with percentile rankings and outlier flags
+      to enable easy operational slicing in BI tools.
+      Grain: One row = one case.
+    columns:
+      - name: case_id
+        description: Unique identifier for the case.
+        tests:
+          - unique
+          - not_null
+      - name: department
+        description: The department(s) involved in the case.
+      - name: priority
+        description: Priority level (currently a staging fabrication for exploration).
+      - name: journey_type
+        description: Journey type classification (currently a staging fabrication for exploration).
+      - name: process_path
+        description: Full sequence of activities from start to finish.
+      - name: cycle_time_minutes
+        description: Total duration of the case in minutes.
+      - name: event_count
+        description: Total number of events for the case.
+      - name: has_repeated_activity
+        description: Boolean indicating if any activity occurred more than once.
+      - name: cycle_time_percentile_rank
+        description: Relative percentile rank (0.0 to 1.0) of this case's cycle time vs all cases.
+      - name: is_long_duration_case
+        description: Boolean flag. True if case cycle time >= overall 95th percentile (P95).
