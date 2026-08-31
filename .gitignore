@@ -20,3 +20,4 @@ dbt_project/logs/
 *.json
 !package.json
 gcp_credentials.json
+data_engineering/mock_events.json
