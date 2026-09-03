@@ -9,3 +9,6 @@ logs/
 
 # Duplicate .txt files (content captured in .md equivalents)
 *.txt
+
+profiles.yml
+.user.yml

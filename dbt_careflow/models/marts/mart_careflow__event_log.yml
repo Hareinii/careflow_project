@@ -1,0 +1,34 @@
+version: 2
+
+models:
+  - name: mart_careflow__event_log
+    description: >
+      Final Event Log formatted for Process Mining tools (e.g., Celonis, Signavio).
+      Exposes the three mandatory concepts: Case ID, Activity Name, and Timestamp.
+      Grain: One row = one event.
+    columns:
+      - name: case_id
+        description: Unique identifier for the process instance (patient journey).
+        tests:
+          - not_null
+      - name: activity_name
+        description: The standardized name of the process step that occurred.
+        tests:
+          - not_null
+      - name: timestamp
+        description: The exact time the activity occurred.
+        tests:
+          - not_null
+      - name: event_id
+        description: Unique identifier for the specific event instance.
+        tests:
+          - unique
+          - not_null
+      - name: event_sequence
+        description: The chronological order of the event within the specific case.
+        tests:
+          - not_null
+      - name: department
+        description: The hospital department where the event occurred.
+      - name: doctor_id
+        description: The identifier for the doctor or resource performing the activity.
