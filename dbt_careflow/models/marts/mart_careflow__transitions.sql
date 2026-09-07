@@ -66,15 +66,14 @@ transition_summary as (
         -- Central tendency
         round(avg(transition_duration_minutes), 2)              as avg_duration_minutes,
 
-        -- Exact percentiles using DuckDB PERCENTILE_CONT
-        -- These are EXACT percentiles computed over the full distribution.
-        percentile_cont(0.50) within group (order by transition_duration_minutes)
+        -- Percentile distributions (using cross-database macro; APPROX_QUANTILES in BigQuery)
+        {{ percentile(0.50, 'transition_duration_minutes') }}
                                                                 as median_duration_minutes,
-        percentile_cont(0.75) within group (order by transition_duration_minutes)
+        {{ percentile(0.75, 'transition_duration_minutes') }}
                                                                 as p75_duration_minutes,
-        percentile_cont(0.90) within group (order by transition_duration_minutes)
+        {{ percentile(0.90, 'transition_duration_minutes') }}
                                                                 as p90_duration_minutes,
-        percentile_cont(0.95) within group (order by transition_duration_minutes)
+        {{ percentile(0.95, 'transition_duration_minutes') }}
                                                                 as p95_duration_minutes,
 
         -- Range
@@ -105,8 +104,7 @@ transition_summary_with_share as (
 
         -- Sum of all durations for this transition
         round(
-            sum(t.transition_duration_minutes)
-                filter (where t.transition_name = ts.transition_name)
+            sum(case when t.transition_name = ts.transition_name then t.transition_duration_minutes end)
         , 2) as total_duration_sum,
 
         -- Total duration across all transitions
@@ -117,8 +115,7 @@ transition_summary_with_share as (
         -- Share of total transition time (percentage)
         round(
             100.0
-            * sum(t.transition_duration_minutes)
-                  filter (where t.transition_name = ts.transition_name)
+            * sum(case when t.transition_name = ts.transition_name then t.transition_duration_minutes end)
             / nullif(sum(t.transition_duration_minutes), 0)
         , 2) as share_of_total_transition_time_pct
 

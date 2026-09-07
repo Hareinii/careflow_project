@@ -25,7 +25,7 @@ events_with_transitions as (
             when next_event_timestamp is null then true
             else false
         end as is_last_event,
-        cast((epoch(event_timestamp) - epoch(previous_event_timestamp)) / 60 as integer) as transition_duration_minutes
+        {{ dbt.datediff("previous_event_timestamp", "event_timestamp", "minute") }} as transition_duration_minutes
     from events_with_sequence
 
 )

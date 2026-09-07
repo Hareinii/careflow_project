@@ -90,10 +90,7 @@ transitions_raw as (
         -- Computed as: (next_event_timestamp - event_timestamp) in minutes
         -- This is distinct from transition_duration_minutes in the source,
         -- which is the BACKWARD-facing duration (from previous event).
-        cast(
-            (epoch(next_event_timestamp) - epoch(event_timestamp)) / 60
-            as integer
-        )                                                as transition_duration_minutes,
+        {{ dbt.datediff("event_timestamp", "next_event_timestamp", "minute") }} as transition_duration_minutes,
 
         -- Dimensional attributes for segmentation
         department,

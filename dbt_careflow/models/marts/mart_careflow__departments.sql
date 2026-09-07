@@ -125,13 +125,13 @@ dept_case_metrics as (
     select
         dc.department,
         round(avg(c.cycle_time_minutes), 2)                                      as avg_cycle_time_minutes,
-        percentile_cont(0.50) within group (order by c.cycle_time_minutes)        as median_cycle_time_minutes,
-        percentile_cont(0.90) within group (order by c.cycle_time_minutes)        as p90_cycle_time_minutes,
-        percentile_cont(0.95) within group (order by c.cycle_time_minutes)        as p95_cycle_time_minutes,
-        count(c.case_id) filter (where c.has_repeated_activity = true)            as repeat_activity_case_count,
+        {{ exact_percentile(0.50, 'c.cycle_time_minutes') }}        as median_cycle_time_minutes,
+        {{ exact_percentile(0.90, 'c.cycle_time_minutes') }}        as p90_cycle_time_minutes,
+        {{ exact_percentile(0.95, 'c.cycle_time_minutes') }}        as p95_cycle_time_minutes,
+        sum(case when c.has_repeated_activity = true then 1 else 0 end)            as repeat_activity_case_count,
         round(
             100.0
-            * count(c.case_id) filter (where c.has_repeated_activity = true)
+            * sum(case when c.has_repeated_activity = true then 1 else 0 end)
             / nullif(count(c.case_id), 0)
         , 2)                                                                       as repeat_activity_case_percentage,
         count(distinct c.process_path)                                             as unique_process_paths
@@ -150,8 +150,8 @@ dept_transitions as (
         department,
         count(*)                                                                   as transition_count,
         round(avg(transition_duration_minutes), 2)                                 as avg_transition_duration_minutes,
-        percentile_cont(0.50) within group (order by transition_duration_minutes)  as median_transition_duration_minutes,
-        percentile_cont(0.90) within group (order by transition_duration_minutes)  as p90_transition_duration_minutes
+        {{ exact_percentile(0.50, 'transition_duration_minutes') }}  as median_transition_duration_minutes,
+        {{ exact_percentile(0.90, 'transition_duration_minutes') }}  as p90_transition_duration_minutes
     from transition_metrics
     group by department
 
@@ -163,7 +163,7 @@ select
     -- Volume
     de.case_count,
     de.event_count,
-    round(cast(de.event_count as float) / nullif(de.case_count, 0), 2) as avg_events_per_case,
+    round(cast(de.event_count as {{ dbt.type_float() }}) / nullif(de.case_count, 0), 2) as avg_events_per_case,
     de.unique_doctors,
 
     -- Cycle time (full case duration for cases touching this department)

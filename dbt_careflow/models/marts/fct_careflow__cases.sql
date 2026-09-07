@@ -16,7 +16,7 @@ case_base as (
         max(event_timestamp) as last_event_timestamp,
         count(*) as event_count,
         count(distinct activity_name) as unique_activity_count,
-        cast((epoch(max(event_timestamp)) - epoch(min(event_timestamp))) / 60 as integer) as cycle_time_minutes
+        {{ dbt.datediff("min(event_timestamp)", "max(event_timestamp)", "minute") }} as cycle_time_minutes
     from ordered_events
     group by case_id
 
@@ -70,7 +70,7 @@ select
         when cb.unique_activity_count < cb.event_count then true
         else false
     end as has_repeated_activity,
-    now() as loaded_at
+    {{ dbt.current_timestamp() }} as loaded_at
 from case_base cb
 left join first_activity_cte fa on cb.case_id = fa.case_id
 left join last_activity_cte la on cb.case_id = la.case_id

@@ -41,7 +41,7 @@ with cases as (
 thresholds as (
 
     select 
-        percentile_cont(0.95) within group (order by cycle_time_minutes) as p95_threshold
+        {{ exact_percentile(0.95, 'cycle_time_minutes') }} as p95_threshold
     from cases
 
 ),

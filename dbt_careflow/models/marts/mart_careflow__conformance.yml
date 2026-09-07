@@ -1,0 +1,77 @@
+version: 2
+
+models:
+  - name: mart_careflow__conformance
+    description: >
+      Evaluates patient journey conformance against the standard baseline pathway
+      (Registration → Triage → Doctor Assessment → X-Ray → Doctor Review → Discharge).
+      Identifies compliant vs non-compliant journeys, missing mandatory activities,
+      ordering sequence violations, and loopback repetition.
+      Grain: One row per case (case_id).
+    columns:
+      - name: case_id
+        description: Unique patient journey identifier.
+        tests:
+          - not_null
+          - unique
+      - name: department
+        description: Primary department associated with the case.
+        tests:
+          - not_null
+      - name: actual_process_path
+        description: Full observed sequence of activities.
+        tests:
+          - not_null
+      - name: ideal_process_path
+        description: Reference baseline standard pathway.
+        tests:
+          - not_null
+      - name: is_path_compliant
+        description: Boolean indicating whether actual journey matches ideal journey exactly.
+        tests:
+          - not_null
+      - name: conformance_status
+        description: High-level classification (Compliant or Non-Compliant).
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Compliant', 'Non-Compliant']
+      - name: deviation_reason
+        description: Diagnostic explanation of pathway variance or conformance.
+        tests:
+          - not_null
+      - name: has_repeated_activity
+        description: Boolean indicating if any activity was repeated during the case.
+        tests:
+          - not_null
+      - name: has_ordering_violation
+        description: Boolean indicating if first occurrences violated sequential order.
+        tests:
+          - not_null
+      - name: has_unexpected_activities
+        description: Boolean indicating if activities outside reference pathway occurred.
+        tests:
+          - not_null
+      - name: event_count
+        description: Total number of events in the case.
+        tests:
+          - not_null
+          - positive_value
+      - name: ideal_event_count
+        description: Expected event count in reference pathway (6).
+        tests:
+          - not_null
+          - positive_value
+      - name: cycle_time_minutes
+        description: Total case duration from registration to discharge in minutes.
+        tests:
+          - not_null
+      - name: reference_journey_source
+        description: Metadata documenting provenance of the reference pathway.
+        tests:
+          - not_null
+      - name: analyzed_at
+        description: Timestamp of analysis execution.
+        tests:
+          - not_null

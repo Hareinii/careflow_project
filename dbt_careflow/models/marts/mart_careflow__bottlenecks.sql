@@ -73,15 +73,15 @@ with transitions as (
 thresholds as (
 
     select
-        percentile_cont(0.50) within group (order by median_duration_minutes)
+        {{ exact_percentile(0.50, 'median_duration_minutes') }}
             as threshold_median_duration,
-        percentile_cont(0.50) within group (order by p95_duration_minutes)
+        {{ exact_percentile(0.50, 'p95_duration_minutes') }}
             as threshold_p95_duration,
-        percentile_cont(0.50) within group (order by transition_count)
+        {{ exact_percentile(0.50, 'transition_count') }}
             as threshold_volume,
-        percentile_cont(0.50) within group (order by share_of_total_transition_time_pct)
+        {{ exact_percentile(0.50, 'share_of_total_transition_time_pct') }}
             as threshold_time_share,
-        percentile_cont(0.50) within group (order by coalesce(stddev_duration_minutes, 0))
+        {{ exact_percentile(0.50, 'coalesce(stddev_duration_minutes, 0)') }}
             as threshold_variability
     from transitions
 

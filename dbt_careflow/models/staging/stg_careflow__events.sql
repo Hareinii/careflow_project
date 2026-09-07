@@ -48,7 +48,7 @@ are provided by the source system.
 with source_data as (
 
     select *
-    from {{ ref('raw_ehr_events') }}
+    from {{ source('careflow', 'raw_ehr_events') }}
 
 ),
 

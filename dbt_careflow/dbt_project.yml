@@ -20,5 +20,12 @@ models:
   dbt_careflow:
     staging:
       +materialized: view
+      +schema: staging
+    intermediate:
+      +schema: intermediate
     marts:
       +materialized: table
+      +schema: marts
+
+seeds:
+  +enabled: false

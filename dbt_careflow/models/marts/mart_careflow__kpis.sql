@@ -122,17 +122,17 @@ kpi_snapshot as (
 
         -- Cycle time distribution
         round(avg(cycle_time_minutes), 2)                                as average_cycle_time_minutes,
-        percentile_cont(0.50) within group (order by cycle_time_minutes) as median_cycle_time_minutes,
-        percentile_cont(0.90) within group (order by cycle_time_minutes) as p90_cycle_time_minutes,
-        percentile_cont(0.95) within group (order by cycle_time_minutes) as p95_cycle_time_minutes,
+        {{ exact_percentile(0.50, 'cycle_time_minutes') }} as median_cycle_time_minutes,
+        {{ exact_percentile(0.90, 'cycle_time_minutes') }} as p90_cycle_time_minutes,
+        {{ exact_percentile(0.95, 'cycle_time_minutes') }} as p95_cycle_time_minutes,
         min(cycle_time_minutes)                                          as minimum_cycle_time_minutes,
         max(cycle_time_minutes)                                          as maximum_cycle_time_minutes,
 
         -- Repeat activity (loopbacks)
-        count(case_id) filter (where has_repeated_activity = true)       as repeat_activity_case_count,
+        sum(case when has_repeated_activity = true then 1 else 0 end)       as repeat_activity_case_count,
         round(
             100.0
-            * count(case_id) filter (where has_repeated_activity = true)
+            * sum(case when has_repeated_activity = true then 1 else 0 end)
             / nullif(count(distinct case_id), 0)
         , 2)                                                             as repeat_activity_case_percentage
 
@@ -167,11 +167,11 @@ registration_to_triage_kpi as (
     select
         count(*)                                                           as reg_to_triage_count,
         round(avg(transition_duration_minutes), 2)                         as reg_to_triage_avg_minutes,
-        percentile_cont(0.50) within group (order by transition_duration_minutes)
+        {{ exact_percentile(0.50, 'transition_duration_minutes') }}
                                                                            as reg_to_triage_median_minutes,
-        percentile_cont(0.90) within group (order by transition_duration_minutes)
+        {{ exact_percentile(0.90, 'transition_duration_minutes') }}
                                                                            as reg_to_triage_p90_minutes,
-        percentile_cont(0.95) within group (order by transition_duration_minutes)
+        {{ exact_percentile(0.95, 'transition_duration_minutes') }}
                                                                            as reg_to_triage_p95_minutes
     from transition_metrics
     where transition_name = 'Registration → Triage'
@@ -189,11 +189,11 @@ assessment_to_xray_kpi as (
     select
         count(*)                                                           as assessment_to_xray_count,
         round(avg(transition_duration_minutes), 2)                         as assessment_to_xray_avg_minutes,
-        percentile_cont(0.50) within group (order by transition_duration_minutes)
+        {{ exact_percentile(0.50, 'transition_duration_minutes') }}
                                                                            as assessment_to_xray_median_minutes,
-        percentile_cont(0.90) within group (order by transition_duration_minutes)
+        {{ exact_percentile(0.90, 'transition_duration_minutes') }}
                                                                            as assessment_to_xray_p90_minutes,
-        percentile_cont(0.95) within group (order by transition_duration_minutes)
+        {{ exact_percentile(0.95, 'transition_duration_minutes') }}
                                                                            as assessment_to_xray_p95_minutes
     from transition_metrics
     where transition_name = 'Doctor Assessment → X-Ray'
@@ -211,11 +211,11 @@ arrival_to_exam_kpi as (
     select
         count(*)                                                           as arrival_to_exam_count,
         round(avg(transition_duration_minutes), 2)                         as arrival_to_exam_avg_minutes,
-        percentile_cont(0.50) within group (order by transition_duration_minutes)
+        {{ exact_percentile(0.50, 'transition_duration_minutes') }}
                                                                            as arrival_to_exam_median_minutes,
-        percentile_cont(0.90) within group (order by transition_duration_minutes)
+        {{ exact_percentile(0.90, 'transition_duration_minutes') }}
                                                                            as arrival_to_exam_p90_minutes,
-        percentile_cont(0.95) within group (order by transition_duration_minutes)
+        {{ exact_percentile(0.95, 'transition_duration_minutes') }}
                                                                            as arrival_to_exam_p95_minutes
     from transition_metrics
     where transition_name = 'Arrival → Exam Started'
@@ -235,15 +235,14 @@ department_kpis as (
         department,
         count(distinct case_id)                                            as dept_case_count,
         count(event_id)                                                    as dept_event_count,
+        {% set dept_cycle_diff = dbt.datediff("first_event_timestamp", "last_event_timestamp", "minute") %}
         round(avg(
-            cast((epoch(last_event_timestamp) - epoch(first_event_timestamp)) / 60 as integer)
+            {{ dept_cycle_diff }}
         ), 2)                                                              as dept_avg_cycle_time_minutes,
-        percentile_cont(0.50) within group (
-            order by cast((epoch(last_event_timestamp) - epoch(first_event_timestamp)) / 60 as integer)
-        )                                                                  as dept_median_cycle_time_minutes,
-        percentile_cont(0.90) within group (
-            order by cast((epoch(last_event_timestamp) - epoch(first_event_timestamp)) / 60 as integer)
-        )                                                                  as dept_p90_cycle_time_minutes
+        {{ exact_percentile(0.50, dept_cycle_diff) }}
+                                                                           as dept_median_cycle_time_minutes,
+        {{ exact_percentile(0.90, dept_cycle_diff) }}
+                                                                           as dept_p90_cycle_time_minutes
     from ordered_events
     group by department
 
@@ -261,8 +260,8 @@ priority_kpis as (
         priority,
         count(distinct case_id)                                            as priority_case_count,
         round(avg(cycle_time_minutes), 2)                                  as priority_avg_cycle_time_minutes,
-        percentile_cont(0.50) within group (order by cycle_time_minutes)   as priority_median_cycle_time_minutes,
-        percentile_cont(0.90) within group (order by cycle_time_minutes)   as priority_p90_cycle_time_minutes
+        {{ exact_percentile(0.50, 'cycle_time_minutes') }}                 as priority_median_cycle_time_minutes,
+        {{ exact_percentile(0.90, 'cycle_time_minutes') }}                 as priority_p90_cycle_time_minutes
     from cases
     group by priority
 
@@ -300,7 +299,7 @@ select
     -- Overall totals
     e.total_events,
     k.total_cases,
-    round(cast(e.total_events as float) / nullif(k.total_cases, 0), 2)   as average_events_per_case,
+    round(cast(e.total_events as {{ dbt.type_float() }}) / nullif(k.total_cases, 0), 2)   as average_events_per_case,
 
     -- Cycle time distribution
     k.average_cycle_time_minutes,
@@ -370,7 +369,7 @@ select
              || ' vs non_final_events=' || r.non_final_event_count
     end                                                                    as reconciliation_transitions,
 
-    now()                                                                  as snapshot_generated_at
+    {{ dbt.current_timestamp() }}                                                                  as snapshot_generated_at
 
 from kpi_snapshot k
 cross join event_kpis e

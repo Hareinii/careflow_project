@@ -1,33 +1,28 @@
 version: 2
 
 sources:
-  - name: careflow_raw
+  - name: careflow
+    database: "{{ env_var('DBT_GCP_PROJECT', 'careflow-507606') }}"
+    schema: "{{ env_var('DBT_GCP_DATASET', 'careflow') }}"
     description: |
-      Raw healthcare event log containing patient case events and activities.
-      Source contains 6,868 events across 1,000 unique cases.
-      Note: Contains 68 duplicate event_id records that require deduplication.
-    schema: careflow_raw
+      Raw EHR healthcare event log in Google Cloud BigQuery.
+      Physical location: careflow-507606.careflow.raw_ehr_events
+      Contains 21 raw event records across patient cases.
     tables:
-      - name: event_log
-        description: One row per activity or event for a patient case journey.
+      - name: raw_ehr_events
+        description: "One row per activity or event for a patient case journey."
         columns:
           - name: event_id
-            description: "Unique event identifier within a case. Example: CF00228_E05. Note: 68 duplicate event_ids exist in the source data."
+            description: "Unique event identifier within a case. Example: EVT001."
           - name: case_id
-            description: "Unique patient or case journey identifier. Example: CF00228."
+            description: "Unique patient or case journey identifier. Example: PAT001."
           - name: activity_name
-            description: "Type of healthcare activity or event such as Doctor Review, Triage, Registration, Doctor Consultation, Discharge, or X-Ray."
+            description: "Type of healthcare activity or event such as Registration, Triage, Doctor Assessment, X-Ray, Doctor Review, Discharge."
           - name: timestamp
-            description: Timestamp when the event occurred.
+            description: "Timestamp when the event occurred."
           - name: department
-            description: Department where the event occurred. Currently all records labeled Emergency.
+            description: "Department where the event occurred. Example: Emergency, Radiology."
           - name: doctor_id
-            description: "Identifier of the clinician associated with the event. Example: DR001 through DR020."
-          - name: priority
-            description: "Priority level of the case. Values: High, Medium, Low."
-          - name: journey_type
-            description: "Classification of the patient journey. Values: Normal, Loopback, Delayed."
-          - name: source_row
-            description: Row number from the source extraction.
+            description: "Identifier of the clinician associated with the event. Example: DR001 through DR009."
           - name: source_system
-            description: System identifier for the data source. All records from WaitData.Published_F1.
+            description: "System identifier for the data source. All records from EHR."

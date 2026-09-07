@@ -15,8 +15,9 @@ models:
         so transition_count >= case_count always.
 
       PERCENTILE METHOD:
-        All percentiles use DuckDB PERCENTILE_CONT which computes EXACT percentiles
-        (not approximate). Aggregates exclude NULL durations per SQL standard behavior.
+        Percentiles in production use Google BigQuery APPROX_QUANTILES(col, 100)[OFFSET(p*100)].
+        This calculates continuous quantile distributions at scale across the transition dataset.
+        Aggregates exclude NULL durations per SQL standard behavior.
         Negative durations are INCLUDED in statistics as data-quality signals.
 
       SHARE OF TOTAL TRANSITION TIME:
